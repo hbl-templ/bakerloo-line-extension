@@ -1,0 +1,283 @@
+{
+  "stations": [
+    {
+      "name": "Station 1",
+      "local_study_area": ["Ward A", "Ward B"],
+      "southwark": {
+        "population": 10000,
+        "ethnicity": {
+          "White": 60,
+          "Black": 20,
+          "Asian": 15,
+          "Other": 5
+        }
+      },
+      "london": {
+        "population": 9000000,
+        "ethnicity": {
+          "White": 44,
+          "Black": 13,
+          "Asian": 18,
+          "Other": 25
+        }
+      },
+      "england": {
+        "population": 56000000,
+        "ethnicity": {
+          "White": 85,
+          "Black": 3,
+          "Asian": 7,
+          "Other": 5
+        }
+      }
+    },
+    {
+      "name": "Station 2",
+      "local_study_area": ["Ward C", "Ward D"],
+      "southwark": {
+        "population": 12000,
+        "ethnicity": {
+          "White": 55,
+          "Black": 25,
+          "Asian": 15,
+          "Other": 5
+        }
+      },
+      "london": {
+        "population": 9000000,
+        "ethnicity": {
+          "White": 44,
+          "Black": 13,
+          "Asian": 18,
+          "Other": 25
+        }
+      },
+      "england": {
+        "population": 56000000,
+        "ethnicity": {
+          "White": 85,
+          "Black": 3,
+          "Asian": 7,
+          "Other": 5
+        }
+      }
+    },
+    {
+      "name": "Station 3",
+      "local_study_area": ["Ward E", "Ward F"],
+      "southwark": {
+        "population": 8000,
+        "ethnicity": {
+          "White": 70,
+          "Black": 10,
+          "Asian": 15,
+          "Other": 5
+        }
+      },
+      "london": {
+        "population": 9000000,
+        "ethnicity": {
+          "White": 44,
+          "Black": 13,
+          "Asian": 18,
+          "Other": 25
+        }
+      },
+      "england": {
+        "population": 56000000,
+        "ethnicity": {
+          "White": 85,
+          "Black": 3,
+          "Asian": 7,
+          "Other": 5
+        }
+      }
+    },
+    {
+      "name": "Station 4",
+      "local_study_area": ["Ward G", "Ward H"],
+      "southwark": {
+        "population": 15000,
+        "ethnicity": {
+          "White": 50,
+          "Black": 30,
+          "Asian": 15,
+          "Other": 5
+        }
+      },
+      "london": {
+        "population": 9000000,
+        "ethnicity": {
+          "White": 44,
+          "Black": 13,
+          "Asian": 18,
+          "Other": 25
+        }
+      },
+      "england": {
+        "population": 56000000,
+        "ethnicity": {
+          "White": 85,
+          "Black": 3,
+          "Asian": 7,
+          "Other": 5
+        }
+      }
+    },
+    {
+      "name": "Station 5",
+      "local_study_area": ["Ward I", "Ward J"],
+      "southwark": {
+        "population": 11000,
+        "ethnicity": {
+          "White": 65,
+          "Black": 15,
+          "Asian": 15,
+          "Other": 5
+        }
+      },
+      "london": {
+        "population": 9000000,
+        "ethnicity": {
+          "White": 44,
+          "Black": 13,
+          "Asian": 18,
+          "Other": 25
+        }
+      },
+      "england": {
+        "population": 56000000,
+        "ethnicity": {
+          "White": 85,
+          "Black": 3,
+          "Asian": 7,
+          "Other": 5
+        }
+      }
+    },
+    {
+      "name": "Station 6",
+      "local_study_area": ["Ward K", "Ward L"],
+      "southwark": {
+        "population": 9000,
+        "ethnicity": {
+          "White": 75,
+          "Black": 10,
+          "Asian": 10,
+          "Other": 5
+        }
+      },
+      "london": {
+        "population": 9000000,
+        "ethnicity": {
+          "White": 44,
+          "Black": 13,
+          "Asian": 18,
+          "Other": 25
+        }
+      },
+      "england": {
+        "population": 56000000,
+        "ethnicity": {
+          "White": 85,
+          "Black": 3,
+          "Asian": 7,
+          "Other": 5
+        }
+      }
+    },
+    {
+      "name": "Station 7",
+      "local_study_area": ["Ward M", "Ward N"],
+      "southwark": {
+        "population": 13000,
+        "ethnicity": {
+          "White": 60,
+          "Black": 20,
+          "Asian": 15,
+          "Other": 5
+        }
+      },
+      "london": {
+        "population": 9000000,
+        "ethnicity": {
+          "White": 44,
+          "Black": 13,
+          "Asian": 18,
+          "Other": 25
+        }
+      },
+      "england": {
+        "population": 56000000,
+        "ethnicity": {
+          "White": 85,
+          "Black": 3,
+          "Asian": 7,
+          "Other": 5
+        }
+      }
+    },
+    {
+      "name": "Station 8",
+      "local_study_area": ["Ward O", "Ward P"],
+      "southwark": {
+        "population": 14000,
+        "ethnicity": {
+          "White": 55,
+          "Black": 25,
+          "Asian": 15,
+          "Other": 5
+        }
+      },
+      "london": {
+        "population": 9000000,
+        "ethnicity": {
+          "White": 44,
+          "Black": 13,
+          "Asian": 18,
+          "Other": 25
+        }
+      },
+      "england": {
+        "population": 56000000,
+        "ethnicity": {
+          "White": 85,
+          "Black": 3,
+          "Asian": 7,
+          "Other": 5
+        }
+      }
+    },
+    {
+      "name": "Station 9",
+      "local_study_area": ["Ward Q", "Ward R"],
+      "southwark": {
+        "population": 16000,
+        "ethnicity": {
+          "White": 50,
+          "Black": 30,
+          "Asian": 15,
+          "Other": 5
+        }
+      },
+      "london": {
+        "population": 9000000,
+        "ethnicity": {
+          "White": 44,
+          "Black": 13,
+          "Asian": 18,
+          "Other": 25
+        }
+      },
+      "england": {
+        "population": 56000000,
+        "ethnicity": {
+          "White": 85,
+          "Black": 3,
+          "Asian": 7,
+          "Other": 5
+        }
+      }
+    }
+  ]
+}
