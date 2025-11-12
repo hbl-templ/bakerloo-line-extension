@@ -366,8 +366,11 @@ def display_ethnicity_data(station_name):
 def display_gender_data(station_name):
     """Display gender distribution data for the selected station."""
     st.subheader("Gender Distribution")
-    # Use c_sex variable from the TS008 dataset (All persons, Female, Male)
-    variables = {"c_sex": "0,1,2"}
+    
+    # Try different variable formats for gender data
+    # NOMIS TS008 uses C_SEX with categories 0 (All), 1 (Male), 2 (Female)
+    # But let's try without specifying to see what's available
+    variables = None  # Start without filtering to see if dataset works
 
     # Get raw data for Local Study Area (averaged across wards)
     lsa_raw = calculate_lsa_average(station_name, NOMIS_DATASETS["gender"], variables)
@@ -381,17 +384,29 @@ def display_gender_data(station_name):
         comparison_full[area_name] = area_resp
         if area_resp and "value" in area_resp:
             comparison_raw[area_name] = area_resp["value"]
+    
+    # If we got errors, try to show helpful info
+    if comparison_full and any(isinstance(v, dict) and 'error' in v for v in comparison_full.values()):
+        st.error("❌ NOMIS API returned errors for all areas. This usually means:")
+        st.markdown("""
+        - The dataset ID in `config/station_config.py` is incorrect for gender data
+        - The variable codes (`c_sex`) don't match what NOMIS expects
+        - The dataset requires different parameters
+        
+        **Suggested fixes:**
+        1. Check if `NOMIS_DATASETS["gender"]` points to the correct dataset (should be NM_2072_1 for Census 2021 TS008)
+        2. Try removing the variable filter to see if the dataset works at all
+        3. Check NOMIS documentation for the correct variable codes
+        """)
+        return
 
+    
     gender_categories = ["Total", "Female", "Male"]
 
     # Extract percentages (handles either percent-only or count/pct pairs)
     lsa_perc = _extract_nomis_percentages(lsa_raw, len(gender_categories))
     comp_perc = {k: _extract_nomis_percentages(v, len(gender_categories)) for k, v in comparison_raw.items()}
-
-    if lsa_perc is None or not any(comp_perc.values()):
-        st.warning("Gender data not available for this area yet.")
-        return
-
+    
     # Build rows in the canonical area order
     rows = []
     for idx, category in enumerate(gender_categories):
@@ -456,37 +471,6 @@ def display_gender_data(station_name):
     cols = [c for c in AREA_ORDER if c in pivot_df.columns]
     pivot_df = pivot_df[cols]
     st.dataframe(pivot_df.round(1), use_container_width=True)
-
-    # Debug expander showing the exact NOMIS request URLs and small response snippets
-    with st.expander("Debug: NOMIS requests and responses", expanded=False):
-        st.write("LSA raw values (averaged across wards):")
-        st.write(lsa_raw)
-
-        base_url = f"https://www.nomisweb.co.uk/api/v01/dataset/{NOMIS_DATASETS['gender']}.jsonstat.json"
-        params_common = {"date": "latest", "measures": "20100,20301"}
-        if variables:
-            params_common.update(variables)
-
-        st.write("LSA ward request URLs:")
-        for ward in STATIONS[station_name]["wards"]:
-            params = params_common.copy()
-            params["geography"] = ward["nomis_code"]
-            url = requests.Request('GET', base_url, params=params).prepare().url
-            st.write(f"{ward['name']} -> {url}")
-
-        st.write("Comparison area request URLs and value snippets:")
-        for area_name, area_code in COMPARISON_AREAS.items():
-            params = params_common.copy()
-            params["geography"] = area_code
-            url = requests.Request('GET', base_url, params=params).prepare().url
-            st.write(f"{area_name} -> {url}")
-            resp = comparison_full.get(area_name)
-            if not resp:
-                st.write("  Response: None")
-            else:
-                # show a short snippet of the 'value' array if present to avoid huge output
-                snippet = resp.get("value") if isinstance(resp, dict) else str(resp)[:500]
-                st.write("  value:", snippet)
 
 def display_religion_data(station_name):
     """Display religion distribution data for the selected station."""
