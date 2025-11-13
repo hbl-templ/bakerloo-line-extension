@@ -403,31 +403,44 @@ def display_gender_data(station_name):
     
     gender_categories = ["Total", "Female", "Male"]
 
-    # Extract percentages (handles either percent-only or count/pct pairs)
-    lsa_perc = _extract_nomis_percentages(lsa_raw, len(gender_categories))
-    comp_perc = {k: _extract_nomis_percentages(v, len(gender_categories)) for k, v in comparison_raw.items()}
+# NOMIS returns pairs: [count_total, pct_total, count_female, pct_female, count_male, pct_male]
+    # We want: Female and Male percentages only
+    gender_categories = ["Female", "Male"]
     
     # Build rows in the canonical area order
     rows = []
-    for idx, category in enumerate(gender_categories):
-        if category == "Total":
-            continue
-        # Local Study Area
+    
+    # Extract LSA percentages (indices 3 and 5 for Female and Male percentages)
+    if lsa_raw and len(lsa_raw) >= 6:
+        female_pct_lsa = lsa_raw[3]  # Female percentage
+        male_pct_lsa = lsa_raw[5]    # Male percentage
+        
         rows.append({
             "Area": "Local Study Area",
-            "Gender": category,
-            "Percentage": lsa_perc[idx] if idx < len(lsa_perc) else None
+            "Gender": "Female",
+            "Percentage": female_pct_lsa
         })
-        # Comparison areas in fixed order
-        for area_name in AREA_ORDER[1:]:
-            if area_name in comp_perc:
-                pct_list = comp_perc[area_name]
+        rows.append({
+            "Area": "Local Study Area",
+            "Gender": "Male",
+            "Percentage": male_pct_lsa
+        })
+    
+    # Extract comparison area percentages
+    for area_name in AREA_ORDER[1:]:
+        if area_name in comparison_raw:
+            vals = comparison_raw[area_name]
+            if vals and len(vals) >= 6:
                 rows.append({
                     "Area": area_name,
-                    "Gender": category,
-                    "Percentage": pct_list[idx] if pct_list and idx < len(pct_list) else None
+                    "Gender": "Female",
+                    "Percentage": vals[3]  # Female percentage
                 })
-
+                rows.append({
+                    "Area": area_name,
+                    "Gender": "Male",
+                    "Percentage": vals[5]  # Male percentage
+                })
     df = pd.DataFrame(rows)
 
     # Create visualization
