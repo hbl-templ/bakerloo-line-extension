@@ -5,6 +5,7 @@
 # Station configurations with ward NOMIS API codes
 STATIONS = {
     "Lambeth North": {
+        "parent_borough": "Lambeth",
         "wards": [
             {"name": "Waterloo and South Bank", "nomis_code": "641735110"},
             {"name": "Borough and Bankside", "nomis_code": "641732386"},
@@ -15,6 +16,7 @@ STATIONS = {
         ]
     },
     "London Road": {
+        "parent_borough": "Southwark",
         "wards": [
             {"name": "Waterloo and South Bank", "nomis_code": "641735110"},
             {"name": "St George's", "nomis_code": "641732405"},
@@ -23,6 +25,7 @@ STATIONS = {
         ]
     },
     "Elephant & Castle": {
+        "parent_borough": "Southwark",
         "wards": [
             {"name": "St George's", "nomis_code": "641732405"},
             {"name": "Kennington", "nomis_code": "641735097"},
@@ -33,6 +36,7 @@ STATIONS = {
         ]
     },
     "Burgess Park": {
+        "parent_borough": "Southwark",
         "wards": [
             {"name": "North Walworth", "nomis_code": "641732396"},
             {"name": "Faraday", "nomis_code": "641732393"},
@@ -42,6 +46,7 @@ STATIONS = {
         ]
     },
     "Old Kent Road": {
+        "parent_borough": "Southwark",
         "wards": [
             {"name": "Old Kent Road", "nomis_code": "641732399"},
             {"name": "Peckham", "nomis_code": "641732400"},
@@ -50,6 +55,7 @@ STATIONS = {
         ]
     },
     "New Cross Gate": {
+        "parent_borough": "Lewisham",
         "wards": [
             {"name": "New Cross", "nomis_code": "641734720"},
             {"name": "Telegraph Hill", "nomis_code": "641734724"},
@@ -58,6 +64,7 @@ STATIONS = {
         ]
     },
     "Lewisham Way Shaft": {
+        "parent_borough": "Lewisham",
         "wards": [
             {"name": "Brockley", "nomis_code": "641734708"},
             {"name": "Deptford", "nomis_code": "641734711"},
@@ -65,6 +72,7 @@ STATIONS = {
         ]
     },
     "Lewisham": {
+        "parent_borough": "Lewisham",
         "wards": [
             {"name": "Ladywell", "nomis_code": "641734716"},
             {"name": "Lewisham Central", "nomis_code": "641734719"},
@@ -73,6 +81,7 @@ STATIONS = {
         ]
     },
     "Wearside Road": {
+        "parent_borough": "Lewisham",
         "wards": [
             {"name": "Ladywell", "nomis_code": "641734716"},
             {"name": "Lewisham Central", "nomis_code": "641734719"},
@@ -83,17 +92,20 @@ STATIONS = {
 
 # Comparison area NOMIS codes
 COMPARISON_AREAS = {
+    "Lambeth": "1778385156",
     "Southwark": "1778385187",
+    "Lewisham": "1778385154",
+    "Greenwich": "1778385144",
     "London": "2013265927",
     "England": "2092957699"
 }
 
 # NOMIS Dataset IDs
 NOMIS_DATASETS = {
-    "population": "NM_2021_1",
-    "age": "NM_2018_1",
-    "ethnicity": "NM_2041_1",
-    "religion": "NM_2049_1",
-    "disability": "C2021TS038",
-    "gender": "NM_2023_1"  # Census 2021 Sex (TS008)
+    'age': 'NM_2018_1',
+    'gender': 'NM_2028_1',
+    'ethnicity': 'NM_2041_1',
+    'religion': 'NM_2049_1',
+    'sexual_orientation': 'NM_2086_1',
+    'languages': 'NM_2043_1'
 }

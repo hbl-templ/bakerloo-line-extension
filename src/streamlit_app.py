@@ -6,6 +6,7 @@ Streamlit application for visualizing demographic data across different stations
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import requests
 from config.station_config import STATIONS, COMPARISON_AREAS, NOMIS_DATASETS
 
@@ -17,7 +18,12 @@ st.set_page_config(
 )
 
 # Global area display order used across tables
-AREA_ORDER = ["Local Study Area", "Southwark", "London", "England"]
+# Note: This is now generated dynamically based on station selection
+def get_area_order(station_name):
+    """Get the area order for comparison based on station's parent borough."""
+    parent_borough = STATIONS.get(station_name, {}).get("parent_borough", "Southwark")
+    return ["Local Study Area", parent_borough, "London", "England"]
+
 # Cache the NOMIS API data fetching
 @st.cache_data
 def fetch_nomis_data(dataset_id, geography_code, variables=None, measures="20100,20301"):
@@ -120,15 +126,21 @@ def display_age_data(station_name):
     
     variables = {"c2021_age_12a": "0...11"}  # Age bands 0 to 85+
     
+    # Get dynamic area order based on station
+    area_order = get_area_order(station_name)
+    parent_borough = area_order[1]  # The borough comparison area
+    
     # Get data for Local Study Area
     lsa_data = calculate_lsa_average(station_name, NOMIS_DATASETS["age"], variables)
     
     # Get data for comparison areas
     comparison_data = {}
-    for area_name, area_code in COMPARISON_AREAS.items():
-        area_data = fetch_nomis_data(NOMIS_DATASETS["age"], area_code, variables)
-        if area_data:
-            comparison_data[area_name] = area_data["value"]
+    for area_name in [parent_borough, "London", "England"]:
+        if area_name in COMPARISON_AREAS:
+            area_code = COMPARISON_AREAS[area_name]
+            area_data = fetch_nomis_data(NOMIS_DATASETS["age"], area_code, variables)
+            if area_data:
+                comparison_data[area_name] = area_data["value"]
     
     if lsa_data and comparison_data:
         # Create DataFrame for visualization with ordered age bands
@@ -137,9 +149,6 @@ def display_age_data(station_name):
             "0-4", "5-9", "10-15", "16-19", "20-24", "25-34",
             "35-49", "50-64", "65-74", "75-84", "85+"
         ]
-
-        # Define the order for areas
-        area_order = ["Local Study Area", "Southwark", "London", "England"]
         
         data = []
         # Add LSA data
@@ -151,7 +160,7 @@ def display_age_data(station_name):
             })
         
         # Add comparison area data in the specified order
-        for area_name in ["Southwark", "London", "England"]:
+        for area_name in [parent_borough, "London", "England"]:
             if area_name in comparison_data:
                 values = comparison_data[area_name]
                 for i, value in enumerate(values[::2]):
@@ -245,15 +254,21 @@ def display_ethnicity_data(station_name):
     
     variables = {"c2021_eth_20": "0,1001...1005"}
     
+    # Get dynamic area order based on station
+    area_order = get_area_order(station_name)
+    parent_borough = area_order[1]
+    
     # Get raw data for Local Study Area (may be counts+percent or just percent)
     lsa_raw = calculate_lsa_average(station_name, NOMIS_DATASETS["ethnicity"], variables)
 
     # Get raw data for comparison areas
     comparison_raw = {}
-    for area_name, area_code in COMPARISON_AREAS.items():
-        area_resp = fetch_nomis_data(NOMIS_DATASETS["ethnicity"], area_code, variables)
-        if area_resp and "value" in area_resp:
-            comparison_raw[area_name] = area_resp["value"]
+    for area_name in [parent_borough, "London", "England"]:
+        if area_name in COMPARISON_AREAS:
+            area_code = COMPARISON_AREAS[area_name]
+            area_resp = fetch_nomis_data(NOMIS_DATASETS["ethnicity"], area_code, variables)
+            if area_resp and "value" in area_resp:
+                comparison_raw[area_name] = area_resp["value"]
 
     # Expected groups (ordered as NOMIS returns)
     ethnic_groups = [
@@ -293,9 +308,6 @@ def display_ethnicity_data(station_name):
     if lsa_perc is None or not any(comp_perc.values()):
         st.warning("Ethnicity data not available for this area yet.")
         return
-
-    # Define the order for areas
-    area_order = ["Local Study Area", "Southwark", "London", "England"]
     
     # Build dataframe rows excluding the Total row
     rows = []
@@ -309,7 +321,7 @@ def display_ethnicity_data(station_name):
             "Percentage": lsa_perc[idx] if idx < len(lsa_perc) else None
         })
         # Then add comparison areas in the specified order
-        for area_name in ["Southwark", "London", "England"]:
+        for area_name in [parent_borough, "London", "England"]:
             if area_name in comp_perc:
                 pct_list = comp_perc[area_name]
                 rows.append({
@@ -367,138 +379,424 @@ def display_gender_data(station_name):
     """Display gender distribution data for the selected station."""
     st.subheader("Gender Distribution")
     
-    # Try different variable formats for gender data
-    # NOMIS TS008 uses C_SEX with categories 0 (All), 1 (Male), 2 (Female)
-    # But let's try without specifying to see what's available
-    variables = None  # Start without filtering to see if dataset works
-
+    # Get dynamic area order based on station
+    area_order = get_area_order(station_name)
+    parent_borough = area_order[1]
+    
+    # Use c_sex variable with 0...2 to get Total, Male, Female
+    # Use only measure 20301 (percent) to avoid getting counts mixed in
+    variables = {"c_sex": "0...2"}
+    
+    # Helper function to fetch gender data with percentage-only measure
+    def fetch_gender_data(geography_code):
+        return fetch_nomis_data(NOMIS_DATASETS["gender"], geography_code, variables, measures="20301")
+    
     # Get raw data for Local Study Area (averaged across wards)
-    lsa_raw = calculate_lsa_average(station_name, NOMIS_DATASETS["gender"], variables)
+    ward_codes = [ward["nomis_code"] for ward in STATIONS[station_name]["wards"]]
+    all_ward_data = []
+    
+    for ward_code in ward_codes:
+        ward_data = fetch_gender_data(ward_code)
+        if ward_data and "value" in ward_data:
+            all_ward_data.append(ward_data["value"])
+    
+    lsa_raw = None
+    if all_ward_data:
+        # Calculate simple mean across wards
+        lsa_raw = [sum(values) / len(values) for values in zip(*all_ward_data)]
 
-    # Get raw data for comparison areas (keep full responses for debugging)
+    # Get raw data for comparison areas
     comparison_raw = {}
-    comparison_full = {}
-    for area_name, area_code in COMPARISON_AREAS.items():
-        area_resp = fetch_nomis_data(NOMIS_DATASETS["gender"], area_code, variables)
-        # store the full response for debugging
-        comparison_full[area_name] = area_resp
-        if area_resp and "value" in area_resp:
-            comparison_raw[area_name] = area_resp["value"]
+    for area_name in [parent_borough, "London", "England"]:
+        if area_name in COMPARISON_AREAS:
+            area_code = COMPARISON_AREAS[area_name]
+            area_resp = fetch_gender_data(area_code)
+            if area_resp and "value" in area_resp:
+                comparison_raw[area_name] = area_resp["value"]
     
-    # If we got errors, try to show helpful info
-    if comparison_full and any(isinstance(v, dict) and 'error' in v for v in comparison_full.values()):
-        st.error("❌ NOMIS API returned errors for all areas. This usually means:")
-        st.markdown("""
-        - The dataset ID in `config/station_config.py` is incorrect for gender data
-        - The variable codes (`c_sex`) don't match what NOMIS expects
-        - The dataset requires different parameters
-        
-        **Suggested fixes:**
-        1. Check if `NOMIS_DATASETS["gender"]` points to the correct dataset (should be NM_2072_1 for Census 2021 TS008)
-        2. Try removing the variable filter to see if the dataset works at all
-        3. Check NOMIS documentation for the correct variable codes
-        """)
+    if not lsa_raw or not comparison_raw:
+        st.warning("Gender data not available for this area yet.")
         return
-
     
-    gender_categories = ["Total", "Female", "Male"]
-
-# NOMIS returns pairs: [count_total, pct_total, count_female, pct_female, count_male, pct_male]
-    # We want: Female and Male percentages only
-    gender_categories = ["Female", "Male"]
-    
-    # Build rows in the canonical area order
+    # Build data rows - NOMIS returns [total_pct, male_pct, female_pct]
+    # We use indices 1 (Male) and 2 (Female)
     rows = []
     
-    # Extract LSA percentages (indices 3 and 5 for Female and Male percentages)
-    if lsa_raw and len(lsa_raw) >= 6:
-        female_pct_lsa = lsa_raw[3]  # Female percentage
-        male_pct_lsa = lsa_raw[5]    # Male percentage
+    # Extract LSA percentages (indices 1 and 2 for Male and Female percentages)
+    if lsa_raw and len(lsa_raw) >= 3:
+        male_pct = lsa_raw[1]    # Male percentage
+        female_pct = lsa_raw[2]  # Female percentage
         
-        rows.append({
-            "Area": "Local Study Area",
-            "Gender": "Female",
-            "Percentage": female_pct_lsa
-        })
         rows.append({
             "Area": "Local Study Area",
             "Gender": "Male",
-            "Percentage": male_pct_lsa
+            "Percentage": male_pct
+        })
+        rows.append({
+            "Area": "Local Study Area",
+            "Gender": "Female",
+            "Percentage": female_pct
         })
     
     # Extract comparison area percentages
-    for area_name in AREA_ORDER[1:]:
+    for area_name in area_order[1:]:
         if area_name in comparison_raw:
             vals = comparison_raw[area_name]
-            if vals and len(vals) >= 6:
-                rows.append({
-                    "Area": area_name,
-                    "Gender": "Female",
-                    "Percentage": vals[3]  # Female percentage
-                })
+            if vals and len(vals) >= 3:
                 rows.append({
                     "Area": area_name,
                     "Gender": "Male",
-                    "Percentage": vals[5]  # Male percentage
+                    "Percentage": vals[1]  # Male percentage
                 })
+                rows.append({
+                    "Area": area_name,
+                    "Gender": "Female",
+                    "Percentage": vals[2]  # Female percentage
+                })
+    
     df = pd.DataFrame(rows)
-
-    # Create visualization
-    fig = px.bar(
-        df,
-        x="Gender",
-        y="Percentage",
-        color="Area",
-        barmode="group",
-        title=f"Gender Distribution - {station_name}",
-        labels={"Percentage": "Percentage (%)", "Gender": "Gender"},
-        color_discrete_sequence=["#DE2110", "#0009AB", "#FF6B6B", "#4B4BFF"]
-    )
-
-    fig.update_layout(
-        legend_title="Area",
-        xaxis_title="Gender",
-        yaxis_title="Percentage (%)",
-        xaxis_tickangle=0,
-        plot_bgcolor="rgba(0,0,0,0)",
-        paper_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(
-            showgrid=True,
-            gridwidth=1,
-            gridcolor="rgba(128,128,128,0.2)",
-            linecolor="rgba(128,128,128,0.2)"
-        ),
-        yaxis=dict(
-            showgrid=True,
-            gridwidth=1,
-            gridcolor="rgba(128,128,128,0.2)",
-            linecolor="rgba(128,128,128,0.2)"
-        )
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Create pivot table with enforced column order and display
+    
+    # Verify data looks correct before plotting
+    if df.empty:
+        st.warning("No gender data available.")
+        return
+    
+    # Create pie charts for each area in a grid layout
+    st.markdown("**Gender Distribution by Area**")
+    
+    # Create 2x2 grid for pie charts
+    col1, col2 = st.columns(2)
+    col3, col4 = st.columns(2)
+    cols = [col1, col2, col3, col4]
+    
+    for idx, area_name in enumerate(area_order):
+        area_data = df[df["Area"] == area_name]
+        
+        if not area_data.empty:
+            with cols[idx]:
+                fig = px.pie(
+                    area_data,
+                    values="Percentage",
+                    names="Gender",
+                    title=area_name,
+                    color="Gender",
+                    color_discrete_map={"Male": "#0009AB", "Female": "#DE2110"},
+                    hole=0.3  # Create a donut chart
+                )
+                
+                fig.update_traces(
+                    textposition='inside',
+                    textinfo='percent+label',
+                    hovertemplate='<b>%{label}</b><br>%{value:.1f}%<extra></extra>'
+                )
+                
+                fig.update_layout(
+                    showlegend=True,
+                    height=300,
+                    margin=dict(t=40, b=20, l=20, r=20),
+                    plot_bgcolor="rgba(0,0,0,0)",
+                    paper_bgcolor="rgba(0,0,0,0)"
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+    
+    # Display data table
+    st.markdown("**Detailed Gender Breakdown**")
     pivot_df = df.pivot(index="Gender", columns="Area", values="Percentage")
-    # Reorder columns to match AREA_ORDER; if some columns missing, filter
-    cols = [c for c in AREA_ORDER if c in pivot_df.columns]
+    # Reorder columns to match area_order
+    cols = [c for c in area_order if c in pivot_df.columns]
     pivot_df = pivot_df[cols]
     st.dataframe(pivot_df.round(1), use_container_width=True)
+
+def display_sexual_orientation_data(station_name):
+    """Display sexual orientation distribution data for borough and London only."""
+    st.subheader("Sexual Orientation")
+    
+    st.info("📊 Sexual orientation data is only available at borough and London level (not ward level).")
+    
+    # Get dynamic area order based on station
+    area_order = get_area_order(station_name)
+    parent_borough = area_order[1]
+    
+    # Fetch sexual orientation data (TS077 - NM_2086_1 with c2021_sexor_9 dimension)
+    # Categories: 0=Total, 1=Straight/Heterosexual, 2=Gay/Lesbian, 3=Bisexual, 
+    # 4=Pansexual, 5=Asexual, 6=Queer, 7=Other, 8=Not answered
+    
+    dataset_id = NOMIS_DATASETS['sexual_orientation']
+    sexual_orientation_data = {}
+    
+    for area_name in [parent_borough, "London"]:
+        area_code = COMPARISON_AREAS[area_name]
+        
+        # Fetch data using jsonstat format
+        url = f"https://www.nomisweb.co.uk/api/v01/dataset/{dataset_id}/geography/{area_code}.jsonstat.json"
+        params = {
+            'date': 'latest',
+            'measures': '20301'  # Percentage only
+        }
+        
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            if response.ok:
+                data = response.json()
+                if 'value' in data:
+                    values = data['value']
+                    # Extract main categories (indices 1-8, skip 0 which is total)
+                    sexual_orientation_data[area_name] = {
+                        'Straight or Heterosexual': values[1],
+                        'Gay or Lesbian': values[2],
+                        'Bisexual': values[3],
+                        'Pansexual': values[4],
+                        'Asexual': values[5],
+                        'Queer': values[6],
+                        'Other sexual orientations': values[7],
+                        'Not answered': values[8]
+                    }
+        except Exception as e:
+            st.error(f"Error fetching data for {area_name}: {str(e)}")
+    
+    if not sexual_orientation_data:
+        st.warning("No data available for this station.")
+        return
+    
+    # Create comparison bar chart
+    categories = list(next(iter(sexual_orientation_data.values())).keys())
+    
+    fig = go.Figure()
+    
+    for area_name in [parent_borough, "London"]:
+        if area_name in sexual_orientation_data:
+            values = [sexual_orientation_data[area_name][cat] for cat in categories]
+            fig.add_trace(go.Bar(
+                name=area_name,
+                x=categories,
+                y=values,
+                text=[f"{v:.1f}%" for v in values],
+                textposition='outside'
+            ))
+    
+    fig.update_layout(
+        title="Sexual Orientation Comparison (%)",
+        xaxis_title="Sexual Orientation",
+        yaxis_title="Percentage (%)",
+        barmode='group',
+        height=600,
+        xaxis={'tickangle': -45}
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Display data table
+    with st.expander("📊 View Sexual Orientation Data Table"):
+        df = pd.DataFrame(sexual_orientation_data).T
+        df = df.round(1)
+        st.dataframe(df, use_container_width=True)
+
+def display_languages_data(station_name):
+    """Display main language distribution data for BLE boroughs."""
+    st.subheader("Main Languages Spoken")
+    
+    st.info("📊 Language data shown at borough level for Lambeth, Lewisham, Greenwich, and Southwark")
+    
+    # Dataset: NM_2043_1 - TS024 Main language (detailed) with 106 categories
+    # We'll focus on top languages
+    dataset_id = NOMIS_DATASETS['languages']
+    
+    # Define the 4 BLE boroughs
+    ble_boroughs = {
+        'Lambeth': COMPARISON_AREAS['Lambeth'],
+        'Lewisham': COMPARISON_AREAS['Lewisham'],
+        'Greenwich': COMPARISON_AREAS['Greenwich'],
+        'Southwark': COMPARISON_AREAS['Southwark']
+    }
+    
+    # Fetch language data for all boroughs
+    all_languages_data = {}
+    
+    for borough_name, area_code in ble_boroughs.items():
+        url = f"https://www.nomisweb.co.uk/api/v01/dataset/{dataset_id}/geography/{area_code}.jsonstat.json"
+        params = {'date': 'latest', 'measures': '20301'}
+        
+        try:
+            response = requests.get(url, params=params, timeout=30)
+            if response.ok:
+                data = response.json()
+                if 'value' in data:
+                    all_languages_data[borough_name] = data['value']
+        except Exception as e:
+            st.error(f"Error fetching language data for {borough_name}: {str(e)}")
+    
+    if not all_languages_data:
+        st.warning("No language data available.")
+        return
+    
+    # Language categories (simplified top languages based on index positions)
+    # Index 0 = Total, 1 = English, then other languages
+    language_categories = [
+        'English (English or Welsh in Wales)',
+        'French',
+        'Portuguese', 
+        'Spanish',
+        'Polish',
+        'Italian',
+        'German',
+        'Romanian',
+        'Arabic',
+        'Bengali',
+        'Urdu',
+        'Tamil',
+        'Punjabi',
+        'Gujarati',
+        'Turkish',
+        'Somali',
+        'Chinese (All Chinese)',
+        'Yoruba',
+        'Akan',
+        'Other language'
+    ]
+    
+    # Map indices to language names (simplified version with main categories)
+    # Based on TS024 structure: 0=Total, 1=English, 13=French, 14=Portuguese, 15=Spanish, etc.
+    language_indices = {
+        'English (English or Welsh in Wales)': 1,
+        'French': 13,
+        'Portuguese': 14,
+        'Spanish': 15,
+        'Polish': 19,
+        'Italian': 17,
+        'German': 18,
+        'Romanian': 22,
+        'Arabic': 46,
+        'Bengali': 69,
+        'Urdu': 68,
+        'Tamil': 65,
+        'Punjabi': 67,
+        'Gujarati': 71,
+        'Turkish': 61,
+        'Somali': 56,
+        'Chinese (All Chinese)': 86,
+        'Yoruba': 55,
+        'Akan': 51,
+        'Other language': 105
+    }
+    
+    # Extract data for each borough
+    borough_language_data = {}
+    for borough_name, values in all_languages_data.items():
+        borough_language_data[borough_name] = {}
+        for lang_name, idx in language_indices.items():
+            if idx < len(values):
+                borough_language_data[borough_name][lang_name] = values[idx]
+    
+    # Create summary table
+    st.markdown("### Language Distribution by Borough")
+    
+    # Build table data - show top 10 languages across all boroughs
+    summary_rows = []
+    for lang_name in language_indices.keys():
+        row = {'Language': lang_name}
+        for borough in ['Lambeth', 'Lewisham', 'Greenwich', 'Southwark']:
+            if borough in borough_language_data and lang_name in borough_language_data[borough]:
+                row[borough] = f"{borough_language_data[borough][lang_name]:.1f}%"
+        summary_rows.append(row)
+    
+    summary_df = pd.DataFrame(summary_rows)
+    st.dataframe(summary_df, use_container_width=True, hide_index=True, height=600)
+    
+    # Visualization: Comparison bar chart for top 10 languages
+    st.markdown("---")
+    st.markdown("### Top 10 Most Spoken Languages (Excluding English)")
+    
+    # Calculate average percentage across boroughs for each language (excluding English)
+    lang_averages = {}
+    for lang_name, idx in language_indices.items():
+        if lang_name != 'English (English or Welsh in Wales)':
+            avg = sum(borough_language_data[b].get(lang_name, 0) for b in ble_boroughs.keys()) / len(ble_boroughs)
+            lang_averages[lang_name] = avg
+    
+    # Get top 10 languages
+    top_languages = sorted(lang_averages.items(), key=lambda x: x[1], reverse=True)[:10]
+    top_lang_names = [lang[0] for lang in top_languages]
+    
+    # Create grouped bar chart
+    fig = go.Figure()
+    
+    for borough in ['Lambeth', 'Lewisham', 'Greenwich', 'Southwark']:
+        values = [borough_language_data[borough].get(lang, 0) for lang in top_lang_names]
+        fig.add_trace(go.Bar(
+            name=borough,
+            x=top_lang_names,
+            y=values,
+            text=[f"{v:.1f}%" for v in values],
+            textposition='outside'
+        ))
+    
+    fig.update_layout(
+        title="Top 10 Most Spoken Languages (Excluding English)",
+        xaxis_title="Language",
+        yaxis_title="Percentage (%)",
+        barmode='group',
+        height=500,
+        xaxis={'tickangle': -45},
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # English language proficiency comparison
+    st.markdown("---")
+    st.markdown("### English Language Speakers")
+    
+    english_data = []
+    for borough in ['Lambeth', 'Lewisham', 'Greenwich', 'Southwark']:
+        english_pct = borough_language_data[borough].get('English (English or Welsh in Wales)', 0)
+        english_data.append({'Borough': borough, 'English Speakers (%)': english_pct})
+    
+    english_df = pd.DataFrame(english_data)
+    
+    fig_english = px.bar(
+        english_df,
+        x='Borough',
+        y='English Speakers (%)',
+        title='Percentage of Residents with English as Main Language',
+        text='English Speakers (%)',
+        height=400
+    )
+    
+    fig_english.update_traces(
+        texttemplate='%{text:.1f}%',
+        textposition='outside',
+        marker_color='#2E86AB'
+    )
+    
+    fig_english.update_layout(
+        showlegend=False,
+        yaxis=dict(range=[0, 100])
+    )
+    
+    st.plotly_chart(fig_english, use_container_width=True)
 
 def display_religion_data(station_name):
     """Display religion distribution data for the selected station."""
     st.subheader("Religion Distribution")
     
     variables = {"c2021_religion_10": "0...9"}
+    
+    # Get dynamic area order based on station
+    area_order = get_area_order(station_name)
+    parent_borough = area_order[1]
+    
     # Get raw data for Local Study Area
     lsa_raw = calculate_lsa_average(station_name, NOMIS_DATASETS["religion"], variables)
 
     # Get raw data for comparison areas
     comparison_raw = {}
-    for area_name, area_code in COMPARISON_AREAS.items():
-        area_resp = fetch_nomis_data(NOMIS_DATASETS["religion"], area_code, variables)
-        if area_resp and "value" in area_resp:
-            comparison_raw[area_name] = area_resp["value"]
+    for area_name in [parent_borough, "London", "England"]:
+        if area_name in COMPARISON_AREAS:
+            area_code = COMPARISON_AREAS[area_name]
+            area_resp = fetch_nomis_data(NOMIS_DATASETS["religion"], area_code, variables)
+            if area_resp and "value" in area_resp:
+                comparison_raw[area_name] = area_resp["value"]
 
     religion_groups = [
         "Total",
@@ -519,9 +817,6 @@ def display_religion_data(station_name):
     if lsa_perc is None or not any(comp_perc.values()):
         st.warning("Religion data not available for this area yet.")
         return
-
-    # Define the order for areas
-    area_order = ["Local Study Area", "Southwark", "London", "England"]
     
     rows = []
     for idx, group in enumerate(religion_groups):
@@ -534,7 +829,7 @@ def display_religion_data(station_name):
             "Percentage": lsa_perc[idx] if idx < len(lsa_perc) else None
         })
         # Then add comparison areas in the specified order
-        for area_name in ["Southwark", "London", "England"]:
+        for area_name in [parent_borough, "London", "England"]:
             if area_name in comp_perc:
                 pct_list = comp_perc[area_name]
                 rows.append({
@@ -1086,7 +1381,41 @@ def display_crime_data(station_name):
             delta=refresh_date if refresh_date != "Unknown" else None
         )
     
+    # Crime Summary Table
+    st.markdown("---")
+    st.markdown(f"### Crime Summary: {selected_borough}")
+    st.markdown("*Study Area Level Crime Data*")
+    
+    # Create summary table with counts and percentages
+    summary_data = []
+    for offence_type in offence_group_totals.index:
+        count = int(offence_group_totals[offence_type])
+        percentage = (offence_group_totals[offence_type] / total_offences * 100)
+        summary_data.append({
+            'Type of Crime': offence_type.title(),
+            'Number': f"{count:,}",
+            'Percentage': f"{percentage:.1f}%"
+        })
+    
+    # Add total row
+    summary_data.append({
+        'Type of Crime': 'Total',
+        'Number': f"{int(total_offences):,}",
+        'Percentage': '100.0%'
+    })
+    
+    summary_df = pd.DataFrame(summary_data)
+    
+    # Display as styled table
+    st.dataframe(
+        summary_df,
+        use_container_width=True,
+        hide_index=True,
+        height=min(400, (len(summary_df) + 1) * 35 + 3)
+    )
+    
     # Create visualizations in two columns
+    st.markdown("---")
     col_left, col_right = st.columns([0.6, 0.4])
     
     # Left column: Time series of offences
@@ -1409,11 +1738,13 @@ def main():
         st.markdown("---")  # Add a separator
         
         # Display tabs for different demographic categories plus placeholders
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9, tab10 = st.tabs([
             "Age Distribution",
             "Gender",
             "Ethnicity",
             "Religion",
+            "Sexual Orientation",
+            "Languages",
             "Deprivation",
             "Homelessness",
             "Crime",
@@ -1433,15 +1764,21 @@ def main():
             display_religion_data(station_name)
 
         with tab5:
-            display_deprivation_data(station_name)
+            display_sexual_orientation_data(station_name)
 
         with tab6:
-            display_homelessness_data(station_name)
+            display_languages_data(station_name)
 
         with tab7:
-            display_crime_data(station_name)
+            display_deprivation_data(station_name)
 
         with tab8:
+            display_homelessness_data(station_name)
+
+        with tab9:
+            display_crime_data(station_name)
+
+        with tab10:
             display_population_growth_data(station_name)
 
 if __name__ == "__main__":
